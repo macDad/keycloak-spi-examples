@@ -1,115 +1,147 @@
-# keycloak-spi-examples
+# Keycloak SPI Examples
 
-Working Keycloak 26 custom SPI examples in Java 21: a custom authenticator, a
-password policy provider, and a nested-claim identity provider mapper - with
-unit tests and a Testcontainers integration test.
+![Keycloak](https://img.shields.io/badge/Keycloak-26.0.7-4D96D9?style=flat-square&logo=keycloak&logoColor=white) ![Java](https://img.shields.io/badge/Java-21-E8833A?style=flat-square&logo=openjdk&logoColor=white) ![Maven](https://img.shields.io/badge/Maven-3.9+-1B2838?style=flat-square&logo=apachemaven&logoColor=white) ![Tests](https://img.shields.io/badge/tests-JUnit%205%20%2B%20Testcontainers-3FA66B?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-C9D2DB?style=flat-square)
 
-Companion code for [Keycloak Custom SPIs: Authenticators, Password Policies and IdP Mappers](https://www.onloadcode.com/post/keycloak-custom-spis-authenticators-password-policies-idp-mappers/)
-on OnloadCode.
+Production-shaped custom extensions for Keycloak 26 — authenticator, password policy provider, and identity provider mapper.
 
-## What's here
+## What this is
 
-- **`ReviewConfirmAuthenticator`** - adds a confirmation screen for accounts
-  flagged with a `requiresReview` attribute (`org.keycloak.authentication.AuthenticatorFactory`)
-- **`NoIdentityInPasswordProvider`** - rejects passwords that contain the
-  user's own username, email local-part, first name or last name
-  (`org.keycloak.policy.PasswordPolicyProviderFactory`)
-- **`NestedClaimToRoleMapper`** - maps a nested/array claim from an external
-  identity provider's token into realm roles
-  (`org.keycloak.broker.provider.IdentityProviderMapper`)
+Three working Keycloak SPIs, each solving a requirement the admin console can't express on its own: a login step that only applies to flagged accounts, a password rule the built-in policies don't cover, and a claim shape the built-in IdP mappers can't reach. Each one is a real, registered provider — not a snippet — with unit tests and an integration test that boots a real Keycloak container.
 
-Each provider is registered the way Keycloak's SPI mechanism expects: a
-`META-INF/services` file per provider type, pointing at the factory (or, for
-the IdP mapper, the provider class itself).
+Companion code for [Keycloak Custom SPIs: Authenticators, Password Policies and IdP Mappers](ARTICLE_URL_PLACEHOLDER) on OnloadCode. The article is the long-form explanation; this README is the reference.
 
-## Prerequisites
+## The three extensions
 
-- Java 21 and Maven 3.9+ (or just use the included `./mvnw`)
-- Docker, for `docker compose up` and for the Testcontainers integration test
+| Extension | What it does | SPI |
+|---|---|---|
+| Review Confirmation Authenticator | Adds a confirmation screen for accounts flagged with `requiresReview=true`, then clears the flag once confirmed. | `org.keycloak.authentication.AuthenticatorFactory` |
+| No-Identity Password Policy | Rejects passwords containing the user's username, email local-part, first name, or last name. | `org.keycloak.policy.PasswordPolicyProviderFactory` |
+| Nested Claim to Role Mapper | Maps a nested or array claim from a brokered OIDC token (e.g. `resource.access.fleet.roles`) into realm roles. | `org.keycloak.broker.provider.IdentityProviderMapper` |
 
-## Build and test
+## Quick start
+
+Clone the repo:
 
 ```bash
-./mvnw clean verify
+git clone https://github.com/macDad/keycloak-spi-examples.git
+cd keycloak-spi-examples
 ```
 
-Runs the unit tests (`NoIdentityInPasswordProviderTest`), packages the JAR,
-then runs the Testcontainers integration test (`AuthenticatorIT`), which
-starts a real Keycloak 26.0.7 container with this JAR mounted and asserts all
-three providers appear in `/admin/serverinfo`. The integration test needs a
-working Docker daemon; if none is reachable it will fail at container
-startup, not silently skip.
-
-## Run it locally
+Build the provider JAR:
 
 ```bash
-mvn package   # or ./mvnw package - the compose file expects target/keycloak-spi-examples.jar
+./mvnw clean package
+```
+
+Start Keycloak with it mounted in:
+
+```bash
 docker compose up
 ```
 
-This starts Keycloak 26.0.7 with the built JAR mounted into `providers/`, a
-`DEBUG` log category for `com.onloadcode.keycloak` so you can watch the
-providers execute, and `keycloak/realm-export.json` auto-imported via
-`--import-realm` - so you can try the authenticator without configuring a
-realm by hand.
+> [!NOTE]
+> The Quarkus distribution needs a build step before a dropped-in provider JAR takes effect. `start-dev` runs that build automatically when it detects the JAR changed, so `docker compose up` alone is enough here. A non-dev deployment needs an explicit `kc.sh build`.
 
-The imported `spi-examples` realm has:
+Once it's running, open `http://localhost:8080`, sign in to the admin console with `admin` / `admin`, and:
 
-- A `flagged-user` (password `Winter-Orbit-7729!`) with `requiresReview=true`,
-  wired through a copy of the browser flow (`browser-with-review`) with the
-  Review Confirmation step added as `REQUIRED` after the password form.
-- A `normal-user` (password `Copper-River-4415!`) with no `requiresReview`
-  attribute, who logs in through the same flow without seeing the extra step.
-- The realm password policy set to `length(8) and noIdentityInPassword`, so
-  registering a new user (or changing a password) rejects anything containing
-  the user's name, username or email.
-- A public client, `spi-examples-client`, for exercising the login flow.
+- Check **Authentication → Flows** for `browser-with-review` — the browser flow copy with the Review Confirmation step added.
+- Check **Realm Settings → Authentication → Policies → Password Policy** for `Not Containing Identity`.
+- Log in as `flagged-user` / `Winter-Orbit-7729!` and you'll hit the confirmation screen; log in as `normal-user` / `Copper-River-4415!` and you won't. Both are pre-created by the realm import.
 
-Once it's up:
+## Project structure
+
+```text
+src/main/java/com/onloadcode/keycloak/
+├── authenticator/
+│   ├── ReviewConfirmAuthenticator.java
+│   └── ReviewConfirmAuthenticatorFactory.java
+├── policy/
+│   ├── NoIdentityInPasswordProvider.java
+│   └── NoIdentityInPasswordProviderFactory.java
+└── mapper/
+    └── NestedClaimToRoleMapper.java
+
+src/main/resources/
+├── META-INF/services/
+│   ├── org.keycloak.authentication.AuthenticatorFactory     # registers the authenticator factory
+│   ├── org.keycloak.policy.PasswordPolicyProviderFactory    # registers the password policy factory
+│   └── org.keycloak.broker.provider.IdentityProviderMapper  # registers the mapper class directly (no separate factory for this SPI)
+└── theme-resources/
+    ├── templates/review-confirm.ftl        # auto-merged into whichever login theme is active
+    └── messages/messages_en.properties     # message keys read by the template and the password policy
+
+src/test/java/com/onloadcode/keycloak/
+├── policy/NoIdentityInPasswordProviderTest.java  # unit tests, no Keycloak server involved
+└── it/AuthenticatorIT.java                       # Testcontainers integration test
+
+keycloak/realm-export.json   # imported automatically by docker-compose.yml
+docker-compose.yml           # Keycloak 26.0.7, JAR mounted into providers/
+```
+
+## Review Confirmation Authenticator
+
+**Requirement:** accounts carrying a `requiresReview` attribute must confirm an extra screen before finishing login; everyone else logs in normally.
+
+**Classes:** `ReviewConfirmAuthenticator`, `ReviewConfirmAuthenticatorFactory`.
+
+**Enable it:** copy the built-in **browser** flow (built-in flows can't be edited directly), add an execution for **Review Confirmation** as `REQUIRED` after the password step, then bind the copy as the realm's browser flow. The bundled realm export already does this as `browser-with-review`.
+
+> [!WARNING]
+> Use `failureChallenge()` for a user mistake, not `failure()`. `failure()` aborts the whole flow with a generic error page; `failureChallenge()` re-renders the form with a message, which is what the user actually needs.
+
+> [!NOTE]
+> `getId()` on the factory is permanent once a realm uses it — it's written into that realm's flow config. Renaming it orphans the execution in every realm that already has it.
+
+## No-Identity Password Policy
+
+**Requirement:** reject passwords containing the username, the email local-part, or the first/last name — a common audit finding the built-in policies (length, digits, reuse, HIBP) don't cover.
+
+**Classes:** `NoIdentityInPasswordProvider`, `NoIdentityInPasswordProviderFactory`.
+
+**Enable it:** **Realm Settings → Authentication → Policies → Password Policy**, add **Not Containing Identity**. The bundled realm sets this via `passwordPolicy: "length(8) and noIdentityInPassword"`.
+
+> [!WARNING]
+> Returning `null` from `validate()` means the password *passed*; returning a `PolicyError` means it failed. It reads backwards the first time — get it wrong and the policy silently accepts everything.
+
+## Nested Claim to Role Mapper
+
+**Requirement:** an enterprise IdP sends roles inside a nested array (e.g. `resource.access.fleet.roles`) that the built-in flat-claim mappers can't reach.
+
+**Classes:** `NestedClaimToRoleMapper`.
+
+**Enable it:** under an identity provider's **Mappers** tab, add **Nested Claim To Role**, and set the `claim.path` and `role.prefix` config values. Not part of the bundled realm export — it needs a real or mock OIDC identity provider to attach to, which is outside the scope of the quick-start realm. You can still confirm it's registered without one: it's in the **Mapper type** dropdown on any OIDC identity provider's Mappers tab, and under `providers["identity-provider-mapper"]` in `/admin/serverinfo`.
+
+> [!WARNING]
+> Implement both `importNewUser()` and `updateBrokeredUser()`. Implementing only `importNewUser()` is the single most common mapper bug: roles apply on first login and then never update again, which usually surfaces months later as access that should have been revoked and wasn't.
+
+## Running the tests
 
 ```bash
-# Admin console: http://localhost:8080  (admin / admin)
-
-TOKEN=$(curl -s -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
-  -d 'client_id=admin-cli' -d 'grant_type=password' \
-  -d 'username=admin' -d 'password=admin' | jq -r .access_token)
-
-curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/admin/serverinfo | jq '.providers.authenticator, .providers."password-policy", .providers."identity-provider-mapper"'
+./mvnw test
 ```
 
-Each of `review-confirm-authenticator`, `noIdentityInPassword` and
-`nested-claim-to-role-mapper` should be in the list.
+Runs the unit tests only (`NoIdentityInPasswordProviderTest`) — no Docker, no Keycloak server, done in under a second.
 
-> The Quarkus distribution needs a build step before a dropped-in provider
-> JAR takes effect. `start-dev` runs this automatically when it detects the
-> JAR has changed, so a plain `docker compose up` is enough here - you don't
-> need to run `kc.sh build` yourself for local development.
-
-## Project layout
-
-```
-src/main/java/com/onloadcode/keycloak/
-  authenticator/   ReviewConfirmAuthenticator(Factory)
-  policy/          NoIdentityInPasswordProvider(Factory)
-  mapper/          NestedClaimToRoleMapper
-src/main/resources/
-  META-INF/services/            SPI registration files
-  theme-resources/templates/    review-confirm.ftl
-  theme-resources/messages/     messages_en.properties
-src/test/java/com/onloadcode/keycloak/
-  policy/          unit tests for the password policy
-  it/              Testcontainers integration test
-keycloak/
-  realm-export.json  imported by docker-compose.yml
+```bash
+./mvnw verify
 ```
 
-`review-confirm.ftl` and its messages live under `theme-resources/`, not a
-full custom theme: Keycloak auto-merges any `theme-resources/templates` and
-`theme-resources/messages` shipped in a provider JAR into whichever login
-theme the realm already uses, so the authenticator works without asking
-anyone to also configure a custom theme.
+Also runs `AuthenticatorIT`, which starts a real Keycloak 26.0.7 container with this JAR mounted via Testcontainers and asserts all three providers appear in `/admin/serverinfo`. Needs a working Docker daemon. Expect well under a minute once the Keycloak image is cached locally; the first run also pays for the image pull.
+
+## Compatibility
+
+| Keycloak | Branch/Tag | Status |
+|---|---|---|
+| 26.0.x | `main` | Supported |
+
+The Keycloak version is pinned in one place: the `keycloak.version` property in `pom.xml`. Bumping it is the first step of an upgrade — see the article for the full sequence.
+
+## Contributing
+
+Issues and PRs are welcome.
+Keep examples minimal and runnable — if it can't be built and exercised with `docker compose up`, it doesn't belong in this repo.
+Run `./mvnw verify` before opening a PR.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
