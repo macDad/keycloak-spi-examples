@@ -1,0 +1,137 @@
+{
+  "realm": "spi-examples",
+  "enabled": true,
+  "passwordPolicy": "length(8) and noIdentityInPassword",
+  "users": [
+    {
+      "username": "flagged-user",
+      "enabled": true,
+      "email": "flagged-user@example.com",
+      "firstName": "Flagged",
+      "lastName": "User",
+      "emailVerified": true,
+      "attributes": {
+        "requiresReview": ["true"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Winter-Orbit-7729!",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "normal-user",
+      "enabled": true,
+      "email": "normal-user@example.com",
+      "firstName": "Normal",
+      "lastName": "User",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Copper-River-4415!",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "spi-examples-client",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "browser-with-review",
+      "description": "Copy of the built-in browser flow with the Review Confirmation step added.",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "flowAlias": "browser-with-review forms",
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-with-review forms",
+      "description": "Username, password and OTP forms, plus the review confirmation step.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "browser-with-review Conditional OTP",
+          "userSetupAllowed": false,
+          "autheticatorFlow": true
+        },
+        {
+          "authenticator": "review-confirm-authenticator",
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-with-review Conditional OTP",
+      "description": "Flow to determine if the OTP is required for the authentication.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        }
+      ]
+    }
+  ],
+  "browserFlow": "browser-with-review"
+}

@@ -1,0 +1,12 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev", "--log-level=INFO,com.onloadcode.keycloak:DEBUG", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./target/keycloak-spi-examples.jar:/opt/keycloak/providers/spi-examples.jar
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
