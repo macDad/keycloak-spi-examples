@@ -8,7 +8,7 @@ Production-shaped custom extensions for Keycloak 26 — authenticator, password 
 
 Three working Keycloak SPIs, each solving a requirement the admin console can't express on its own: a login step that only applies to flagged accounts, a password rule the built-in policies don't cover, and a claim shape the built-in IdP mappers can't reach. Each one is a real, registered provider — not a snippet — with unit tests and an integration test that boots a real Keycloak container.
 
-Companion code for [Keycloak Custom SPIs: Authenticators, Password Policies and IdP Mappers](ARTICLE_URL_PLACEHOLDER) on OnloadCode. The article is the long-form explanation; this README is the reference.
+Companion code for [Keycloak Custom SPIs: Authenticators, Password Policies and IdP Mappers](ARTICLE_URL_PLACEHOLDER) <!-- TODO: replace ARTICLE_URL_PLACEHOLDER with the published post URL --> on OnloadCode. The article is the long-form explanation; this README is the reference.
 
 ## The three extensions
 
@@ -126,7 +126,10 @@ Runs the unit tests only (`NoIdentityInPasswordProviderTest`) — no Docker, no 
 ./mvnw verify
 ```
 
-Also runs `AuthenticatorIT`, which starts a real Keycloak 26.0.7 container with this JAR mounted via Testcontainers and asserts all three providers appear in `/admin/serverinfo`. Needs a working Docker daemon. Expect well under a minute once the Keycloak image is cached locally; the first run also pays for the image pull.
+Also runs `AuthenticatorIT`, which starts a real Keycloak 26.0.7 container with this JAR mounted via Testcontainers and asserts all three providers appear in `/admin/serverinfo`. Needs a working Docker daemon — the test starts the container itself, it doesn't skip if one isn't reachable.
+
+> [!NOTE]
+> Testcontainers' Docker-detection probe targets the `v1.32` Docker Engine API. Some Docker Desktop versions return `400 Bad Request` for that specific version path even though the daemon itself is reachable and healthy, which fails `AuthenticatorIT` before any container starts. If `./mvnw verify` fails at that point, check whether `curl --unix-socket <docker.sock> http://localhost/v1.32/info` also returns 400 on your machine.
 
 ## Compatibility
 
